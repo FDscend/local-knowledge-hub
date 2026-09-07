@@ -1,0 +1,28 @@
+// @ts-nocheck — 第三方 lark 转换核心源码（cloud-document-converter fork），不参与本项目类型检查。
+export const compare = (a: number, b: number): 0 | 1 | -1 => {
+  if (a === b) return 0
+
+  return a > b ? 1 : -1
+}
+
+/**
+ * @returns whether the provided parameter is defined.
+ */
+export function isDefined<T>(arg: T | null | undefined): arg is T {
+  return !isUndefinedOrNull(arg)
+}
+
+/**
+ * @returns whether the provided parameter is undefined or null.
+ */
+export function isUndefinedOrNull(obj: unknown): obj is undefined | null {
+  return isUndefined(obj) || obj === null
+}
+
+/**
+ * @returns whether the provided parameter is undefined.
+ */
+export function isUndefined(obj: unknown): obj is undefined {
+  return typeof obj === 'undefined'
+}
+

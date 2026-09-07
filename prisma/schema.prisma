@@ -1,0 +1,488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum SourceType {
+  MD
+  CLIPPING
+  PDF
+  DOCX
+  PPTX
+  XLSX
+  IMAGE
+  MANUAL
+}
+
+enum DocumentStatus {
+  ACTIVE
+  DRAFT
+  DISABLED
+}
+
+enum IngestMode {
+  HEADING_CHUNKS
+  SMALL_NOTE
+}
+
+enum IngestRunStatus {
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+enum ImportSourceMode {
+  SNAPSHOT
+  SYNC
+}
+
+enum KnowledgeSourceKind {
+  MANIFEST
+  UPLOAD
+  MANUAL
+  DIRECTORY
+  WEB
+}
+
+enum ManagedObjectKind {
+  SOURCE
+  ASSET
+}
+
+enum EvaluationSetKind {
+  AUTO_CANDIDATE
+  REVIEWED_REGRESSION
+}
+
+enum EvaluationRunStatus {
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+model KnowledgeBase {
+  id                    String                  @id @default(cuid())
+  name                  String                  @unique
+  description           String?
+  defaultLanguage       String                  @default("zh-CN")
+  syncRootPath          String?                 @unique
+  settings              String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  documents             KnowledgeDocument[]
+  sources               KnowledgeSource[]
+  ingestRuns            IngestRun[]
+  managedObjects        ManagedObject[]
+  managedAssets         ManagedAsset[]
+  auditLogs             AuditLog[]
+  evaluationSets        EvaluationSet[]
+  evaluationRuns        EvaluationRun[]
+  retrievalConfig       RetrievalConfig?
+  retrievalConfigChanges RetrievalConfigChange[]
+  tasks                 Task[]
+  conversations         Conversation[]
+  drafts                DocumentDraft[]
+  graphNodes            GraphNode[]
+  graphEdges            GraphEdge[]
+}
+
+model RetrievalConfig {
+  id               String         @id @default(cuid())
+  knowledgeBaseId  String         @unique
+  channelTopK      Int            @default(30)
+  rrfK             Int            @default(60)
+  mmrLambda        Float          @default(0.7)
+  rrfScoreWeight   Float          @default(1)
+  appliedFromRunId String?
+  appliedAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  knowledgeBase    KnowledgeBase  @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId])
+}
+
+model RetrievalConfigChange {
+  id              String        @id @default(cuid())
+  knowledgeBaseId String
+  kind            String
+  sourceRunId     String?
+  beforeJson      String
+  afterJson       String
+  reason          String?
+  createdAt       DateTime      @default(now())
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId, createdAt])
+}
+
+model Task {
+  id               String        @id @default(cuid())
+  knowledgeBaseId  String
+  kind             String
+  status           String        @default("QUEUED")
+  attempts         Int           @default(0)
+  maxAttempts      Int           @default(2)
+  autoTriggered    Boolean       @default(false)
+  payloadJson      String?
+  resultJson       String?
+  errorText        String?
+  progressCurrent  Int           @default(0)
+  progressTotal    Int           @default(0)
+  createdAt        DateTime      @default(now())
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  knowledgeBase    KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([knowledgeBaseId, createdAt])
+}
+
+model KnowledgeSource {
+  id                     String           @id @default(cuid())
+  knowledgeBaseId        String
+  kind                   KnowledgeSourceKind
+  importMode             ImportSourceMode @default(SNAPSHOT)
+  canonicalPathOrUrl     String
+  contentHash            String?
+  sourceFileHash         String?
+  lastSeenAt             DateTime?
+  syncStatus             String?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  knowledgeBase          KnowledgeBase    @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  documents              KnowledgeDocument[]
+
+  @@index([knowledgeBaseId])
+  @@index([knowledgeBaseId, canonicalPathOrUrl])
+}
+
+model KnowledgeDocument {
+  id              String          @id @default(cuid())
+  knowledgeBaseId String          @default("default")
+  sourceId        String?
+  currentVersionId String?        @unique
+  importId        String?
+  slug            String
+  title           String
+  summary         String?
+  tagsText        String
+  domain          String
+  sourceType      SourceType
+  sourcePath      String
+  sourceUrl       String?
+  status          DocumentStatus  @default(ACTIVE)
+  ingestMode      IngestMode?
+  content         String
+  frontmatter     String?
+  lastIngestRunId String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  chunks          KnowledgeChunk[]
+  knowledgeBase   KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  source          KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  versions        DocumentVersion[] @relation("DocumentVersions")
+  currentVersion  DocumentVersion? @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  lastIngestRun   IngestRun?      @relation("IngestRunDocuments", fields: [lastIngestRunId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([domain])
+  @@index([knowledgeBaseId, status])
+  @@index([knowledgeBaseId, updatedAt])
+  @@unique([knowledgeBaseId, importId])
+  @@unique([knowledgeBaseId, slug])
+}
+
+model DocumentVersion {
+  id                String            @id @default(cuid())
+  documentId        String
+  contentMarkdown   String
+  contentHash       String
+  managedObjectHash String?
+  createdBy         String            @default("system")
+  changeReason      String            @default("import")
+  createdAt         DateTime          @default(now())
+  document          KnowledgeDocument @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+  currentFor        KnowledgeDocument? @relation("CurrentDocumentVersion")
+  assets            ManagedAsset[]
+
+  @@index([documentId, createdAt])
+  @@index([contentHash])
+}
+
+model KnowledgeChunk {
+  id            String            @id @default(cuid())
+  documentId    String
+  chunkIndex    Int
+  heading       String?
+  sectionPath   String
+  content       String
+  tokenEstimate Int
+  createdAt     DateTime          @default(now())
+  document      KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+}
+
+model IngestRun {
+  id            String          @id @default(cuid())
+  knowledgeBaseId String        @default("default")
+  source        String
+  priority      String
+  status        IngestRunStatus @default(RUNNING)
+  importedCount Int             @default(0)
+  chunkCount    Int             @default(0)
+  errorText     String?
+  startedAt     DateTime        @default(now())
+  finishedAt    DateTime?
+  documents     KnowledgeDocument[] @relation("IngestRunDocuments")
+  knowledgeBase KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([startedAt])
+  @@index([knowledgeBaseId, startedAt])
+}
+
+model ManagedObject {
+  id             String              @id @default(cuid())
+  knowledgeBaseId String             @default("default")
+  sha256         String
+  kind           ManagedObjectKind
+  storagePath    String
+  mimeType       String?
+  size           Int
+  referenceCount Int                 @default(0)
+  retentionUntil DateTime?
+  createdAt      DateTime            @default(now())
+  knowledgeBase  KnowledgeBase       @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  assets         ManagedAsset[]
+
+  @@unique([knowledgeBaseId, sha256])
+  @@unique([knowledgeBaseId, id])
+  @@index([knowledgeBaseId])
+}
+
+model ManagedAsset {
+  id                String            @id @default(cuid())
+  knowledgeBaseId   String
+  objectId          String
+  documentVersionId String?
+  originalName      String
+  originalPath      String?
+  createdAt         DateTime          @default(now())
+  knowledgeBase     KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  object            ManagedObject     @relation(fields: [knowledgeBaseId, objectId], references: [knowledgeBaseId, id], onDelete: Restrict)
+  documentVersion   DocumentVersion?  @relation(fields: [documentVersionId], references: [id], onDelete: SetNull)
+
+  @@index([knowledgeBaseId])
+  @@index([documentVersionId])
+}
+
+model AuditLog {
+  id              String        @id @default(cuid())
+  knowledgeBaseId String
+  actor           String        @default("local-admin")
+  action          String
+  targetType      String
+  targetId        String
+  beforeData      String?
+  afterData       String?
+  createdAt       DateTime      @default(now())
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId, createdAt])
+}
+
+model EvaluationSet {
+  id              String            @id @default(cuid())
+  knowledgeBaseId String
+  name            String
+  description     String?
+  kind            EvaluationSetKind @default(AUTO_CANDIDATE)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  knowledgeBase   KnowledgeBase     @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  cases           EvaluationCase[]
+  runs            EvaluationRun[]
+
+  @@unique([knowledgeBaseId, name])
+  @@index([knowledgeBaseId, updatedAt])
+}
+
+model EvaluationCase {
+  id                    String           @id @default(cuid())
+  evaluationSetId       String
+  externalId            String
+  question              String
+  expectedTitles        String           @default("[]")
+  expectedDocumentIds   String           @default("[]")
+  expectedChunkIds      String           @default("[]")
+  referenceAnswer       String?
+  answerPoints          String?
+  reviewed              Boolean          @default(false)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  evaluationSet         EvaluationSet    @relation(fields: [evaluationSetId], references: [id], onDelete: Cascade)
+  results               EvaluationResult[]
+
+  @@unique([evaluationSetId, externalId])
+  @@index([evaluationSetId, updatedAt])
+}
+
+model EvaluationRun {
+  id                       String             @id @default(cuid())
+  knowledgeBaseId          String
+  evaluationSetId          String
+  status                   EvaluationRunStatus @default(RUNNING)
+  retrievalConfigSnapshot  String
+  indexSnapshot            String?
+  dataSnapshot             String?
+  metricsJson              String?
+  configOverridesJson      String?
+  isSandbox                Boolean            @default(false)
+  caseCount                Int                @default(0)
+  completedCount           Int                @default(0)
+  hitAt1Count              Int                @default(0)
+  hitAt3Count              Int                @default(0)
+  hitAt5Count              Int                @default(0)
+  meanRecallAt5            Float              @default(0)
+  meanReciprocalRank       Float              @default(0)
+  errorText                String?
+  startedAt                DateTime           @default(now())
+  finishedAt               DateTime?
+  knowledgeBase            KnowledgeBase      @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  evaluationSet            EvaluationSet      @relation(fields: [evaluationSetId], references: [id], onDelete: Cascade)
+  results                  EvaluationResult[]
+
+  @@index([knowledgeBaseId, startedAt])
+  @@index([evaluationSetId, startedAt])
+}
+
+model EvaluationResult {
+  id                  String         @id @default(cuid())
+  runId               String
+  caseId              String
+  externalId          String
+  question            String
+  expectedTitles      String         @default("[]")
+  expectedDocumentIds String         @default("[]")
+  expectedChunkIds    String         @default("[]")
+  actualTitles        String         @default("[]")
+  actualDocumentIds   String         @default("[]")
+  actualChunkIds      String         @default("[]")
+  retrievalMode       String?
+  retrievalDebug      String?
+  status              String         @default("SUCCEEDED")
+  firstRelevantRank   Int?
+  hitAt1              Boolean        @default(false)
+  hitAt3              Boolean        @default(false)
+  hitAt5              Boolean        @default(false)
+  recallAt5           Float          @default(0)
+  reciprocalRank      Float          @default(0)
+  durationMs          Int?
+  failureReason       String?
+  generatedAnswer     String?
+  answerScoreJson     String?
+  answerScoreStatus   String         @default("NOT_ATTEMPTED")
+  createdAt           DateTime       @default(now())
+  run                 EvaluationRun  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  evaluationCase      EvaluationCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, caseId])
+  @@index([caseId, createdAt])
+}
+
+model Conversation {
+  id              String        @id @default(cuid())
+  knowledgeBaseId String
+  title           String        @default("新会话")
+  archived        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  messages        Message[]
+
+  @@index([knowledgeBaseId, archived, updatedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  role           String
+  title          String?
+  content        String
+  citationsJson  String       @default("[]")
+  retrievalMode  String?
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model DocumentDraft {
+  id                   String          @id @default(cuid())
+  knowledgeBaseId      String
+  kind                 String          // CREATE / PATCH / DISABLE
+  documentId           String?         // PATCH / DISABLE 目标文档
+  documentTitle        String          // 草稿文档标题快照
+  contentMarkdown      String          // 应用后的完整 Markdown
+  patchJson            String?         // PATCH 结构化 diff（before / after 行级）
+  changeReason         String?         // 变更理由（来自助手提案或用户输入）
+  status               String          @default("PENDING") // PENDING / APPLIED / REJECTED
+  sourceTool           String          // create_document_draft / propose_document_patch / disable_document / summarize_conversation_to_draft
+  sourceConversationId String?
+  sourceMessageId      String?
+  modelInfo            String?         // 生成模型信息
+  citationsJson        String?         // 提案引用来源快照
+  appliedDocumentId    String?
+  appliedVersionId     String?
+  appliedAt            DateTime?
+  rejectedAt           DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  knowledgeBase        KnowledgeBase   @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeBaseId, status, createdAt])
+  @@index([knowledgeBaseId, documentId])
+}
+
+model GraphNode {
+  id              String        @id @default(cuid())
+  knowledgeBaseId String
+  nodeType        String        // DOCUMENT / TAG
+  documentId      String?       // DOCUMENT 节点关联的文档
+  label           String        // 节点显示名（文档标题或标签名）
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  outEdges        GraphEdge[]   @relation("GraphEdgeSource")
+  inEdges         GraphEdge[]   @relation("GraphEdgeTarget")
+
+  @@unique([knowledgeBaseId, nodeType, label])
+  @@index([knowledgeBaseId, nodeType])
+}
+
+model GraphEdge {
+  id              String        @id @default(cuid())
+  knowledgeBaseId String
+  edgeType        String        // MARKDOWN_LINK / HAS_TAG / SAME_SOURCE / SEMANTIC
+  sourceNodeId    String
+  targetNodeId    String
+  confidence      Float         @default(1)
+  provenance      String        // 证据来源说明（如"文档内 Markdown 链接"）
+  evidenceJson    String?       // 证据详情（链接文本、共享标签、相似度分数等）
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  knowledgeBase   KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  sourceNode      GraphNode     @relation("GraphEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  targetNode      GraphNode     @relation("GraphEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNodeId, targetNodeId, edgeType])
+  @@index([knowledgeBaseId, edgeType])
+  @@index([knowledgeBaseId, sourceNodeId])
+  @@index([knowledgeBaseId, targetNodeId])
+}

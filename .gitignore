@@ -1,0 +1,37 @@
+# 依赖与构建产物
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# 环境变量（密钥不入库）
+.env
+.env.local
+.env.*.local
+
+# SQLite 数据库
+prisma/dev.db
+prisma/dev.db-journal
+
+# 本地运行时数据（知识库切片/向量/备份）
+.data/
+.ref/
+
+# Python 虚拟环境
+.venv/
+
+# 个人/开发文档与本地配置
+docs/
+.github/
+.vscode/
+.npmrc
+materials/
+
+# 上传的知识库资产
+public/uploads/
+
+# 系统与杂项
+.DS_Store
+Thumbs.db
+*.log
