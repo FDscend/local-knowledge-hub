@@ -19,9 +19,6 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <div className="workspace-toolbar-copy">
           <p className="workspace-kicker">OVERVIEW</p>
           <h2>{knowledgeBase.name}</h2>
-          <p className="muted-text">
-            {knowledgeBase.description || "本机运行的独立知识库。"} {knowledgeBase.syncRootPath ? "当前库通过受控目录同步；" : "当前快照库支持手动录入和浏览器上传；"}当前版本支持知识管理、关键词搜索和基于检索的简易问答。
-          </p>
         </div>
         <div className="workspace-toolbar-actions">
           <Link href={`/knowledge?knowledgeBaseId=${encodeURIComponent(knowledgeBase.id)}`} className="button secondary">
@@ -34,6 +31,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             进入问答页
           </Link>
         </div>
+        <p className="muted-text overview-toolbar-description">
+          {knowledgeBase.description || "本机运行的独立知识库。"} {knowledgeBase.syncRootPath ? "当前库通过受控目录同步；" : "当前快照库支持手动录入和浏览器上传；"}当前版本支持知识管理、关键词搜索和基于检索的简易问答。
+        </p>
       </header>
 
       <div className="workspace-content overview-content">

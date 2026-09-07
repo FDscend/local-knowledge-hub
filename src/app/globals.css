@@ -1060,9 +1060,30 @@ section[id^="evaluation-"] {
   display: flex;
   flex: 0 0 auto;
   flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: flex-end;
   gap: 8px;
   padding-top: 12px;
+}
+
+.overview-toolbar {
+  flex-wrap: wrap;
+}
+
+.overview-toolbar-description {
+  flex: 1 1 100%;
+  max-width: none;
+  margin: 10px 0 0;
+}
+
+.tasks-toolbar {
+  flex-wrap: wrap;
+}
+
+.tasks-toolbar-description {
+  flex: 1 1 100%;
+  max-width: none;
+  margin: 10px 0 0;
 }
 
 .knowledge-toolbar-summary {
@@ -1088,6 +1109,16 @@ section[id^="evaluation-"] {
 
 .tasks-filter-form .field {
   margin: 0;
+}
+
+.tasks-filter-form .button {
+  height: 48px;
+  padding: 12px 16px;
+}
+
+.workspace-toolbar-actions > .button {
+  height: 48px;
+  padding: 12px 16px;
 }
 
 .sync-selected-block {

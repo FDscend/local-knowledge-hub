@@ -38,9 +38,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         <div className="workspace-toolbar-copy">
           <p className="workspace-kicker">TASK QUEUE</p>
           <h2>任务中心</h2>
-          <p className="muted-text">
-            所有后台任务（评测、自动评测、向量索引重建、导入）统一在这里排队、执行、重试与取消。自动评测由导入或检索配置变更触发，报告始终标记为“自动触发”，不等同于人工审核指标。
-          </p>
+
         </div>
         <div className="workspace-toolbar-actions">
           <form method="get" className="tasks-filter-form">
@@ -61,6 +59,9 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           </form>
           <Link className="button secondary" href="/evaluations">返回评测</Link>
         </div>
+        <p className="muted-text tasks-toolbar-description">
+          所有后台任务（评测、自动评测、向量索引重建、导入）统一在这里排队、执行、重试与取消。自动评测由导入或检索配置变更触发，报告始终标记为"自动触发"，不等同于人工审核指标。
+        </p>
       </header>
 
       {queued === "1" ? (
