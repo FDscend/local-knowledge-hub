@@ -137,3 +137,7 @@ codex mcp add ai-knowledge-base --command node --args "node_modules/tsx/dist/cli
 ```
 
 > 本地测试材料（如 `materials/` 目录）已加入 `.gitignore`，不会随仓库分发。
+
+## 许可证
+
+[MIT License](LICENSE)
